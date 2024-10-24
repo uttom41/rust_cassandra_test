@@ -1,0 +1,15 @@
+[package]
+name = "thread_test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rocket = { version = "0.5.0-rc.3", features = ["json"] }
+serde = { version = "1.0.213", features = ["derive"] }
+serde_json = "1.0.132"
+uuid = { version = "1.11.0", features = ["serde"] }
+# cassandra-cpp = "3.0.1"
+# openssl = { version = "0.10", features = ["vendored"] }
+# libuv = "2.9.0"  
+scylla = "0.14.0"
+tokio = { version = "1", features = ["full"] } 
