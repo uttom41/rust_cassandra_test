@@ -52,7 +52,7 @@ pub struct User {
 
 #[derive(Debug,Deserialize,Serialize)]
 pub struct  UserRole{
-    pub id: Option<Uuid>,
-    pub user_id: Option<Uuid>,
+    pub id: String,
+    pub user_id: String,
     pub role: Option<String>,
 }

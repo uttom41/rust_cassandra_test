@@ -6,7 +6,7 @@ use scylla::{Session, SessionBuilder};
 use uuid::Uuid;
 
 mod  models;
-use models::User;
+use models::{User, UserRole};
 
 struct CassandraDb {
     session: Session,
@@ -173,11 +173,34 @@ async fn create_user(new_user: Json<User>, state: &State<CassandraDb>) -> Result
         new_user.value40.clone().unwrap_or_default(),
     ].as_ref()).await;
     
+    let user_id = id.clone().to_string();
 
     match result {
-        Ok(_) => Ok(format!("User inserted successfully: {:?}", id)),
+        Ok(_) =>{
+            let role = insertRole(&user_id,state).await;
+             Ok( format!("User inserted successfully: {:?},{:?}", id,role))
+             }
         Err(e) => Err(format!("Error inserting user: {}", e)),
     }
+}
+
+async fn insertRole(user_id: &String, state: &State<CassandraDb>) ->Json<UserRole> {
+    let id = Uuid::new_v4(); 
+    let insert_query = "INSERT INTO my_saas.user_role (id, user_id, role) VALUES (?,?,?)";
+
+   let result = state.session.query_unpaged(insert_query, [
+        id.to_string(),
+        user_id.clone(),
+        "admin".to_string(),
+    ].as_ref()).await.expect("Data is not available");
+
+    let role = UserRole{
+        id: id.to_string(),
+        user_id: user_id.clone(),
+        role: Some("admin".to_string()),
+    };
+    Json(role)
+
 }
 
 // GET API to fetch all users
