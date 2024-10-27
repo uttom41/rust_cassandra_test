@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 #[derive(Debug,Deserialize,Serialize)]
 pub struct User {
-    pub id: Option<Uuid>,
+    pub id: String,
     pub username: Option<String>,
     pub email: Option<String>,
     pub password: Option<String>,
