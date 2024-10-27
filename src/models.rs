@@ -1,6 +1,4 @@
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-
 
 #[derive(Debug,Deserialize,Serialize)]
 pub struct User {
@@ -48,6 +46,7 @@ pub struct User {
     pub value38: Option<String>,
     pub value39: Option<String>,
     pub value40: Option<String>,
+    pub role: Option<UserRole>,
 }
 
 #[derive(Debug,Deserialize,Serialize)]

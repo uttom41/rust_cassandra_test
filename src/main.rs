@@ -177,14 +177,14 @@ async fn create_user(new_user: Json<User>, state: &State<CassandraDb>) -> Result
 
     match result {
         Ok(_) =>{
-            let role = insertRole(&user_id,state).await;
+            let role = insert_role(&user_id,state).await;
              Ok( format!("User inserted successfully: {:?},{:?}", id,role))
              }
         Err(e) => Err(format!("Error inserting user: {}", e)),
     }
 }
 
-async fn insertRole(user_id: &String, state: &State<CassandraDb>) ->Json<UserRole> {
+async fn insert_role(user_id: &String, state: &State<CassandraDb>) ->Json<UserRole> {
     let id = Uuid::new_v4(); 
     let insert_query = "INSERT INTO my_saas.user_role (id, user_id, role) VALUES (?,?,?)";
 
@@ -220,7 +220,7 @@ async fn get_users(state: &State<CassandraDb>) -> Json<Vec<User>> {
      if let Some(rows) = rows_opt.rows {
         for row in rows {
     
-            // Check if the row is Some
+            // Check if the row is Some 
                 // Extract values safely
                 let id: Option<String> = row.columns[0].as_ref().unwrap().as_text().cloned();
                 let username: Option<String> = row.columns[1].as_ref().unwrap().as_text().cloned();
@@ -317,6 +317,7 @@ async fn get_users(state: &State<CassandraDb>) -> Json<Vec<User>> {
                     value38,
                     value39,
                     value40,
+                    role:None,
                 };
                 users.push(user);
             
@@ -324,6 +325,33 @@ async fn get_users(state: &State<CassandraDb>) -> Json<Vec<User>> {
     } else {
         eprintln!("No rows found.");
     }
+
+for user in  &mut users {
+    let role_query = "SELECT id, user_id, role FROM my_saas.user_role WHERE user_id = ?  ALLOW FILTERING";
+    let role_params = &[&user.id];
+
+// Use `query_unpaged` with the single parameter
+let role_opt = state.session
+    .query_unpaged(role_query, role_params.as_ref())
+    .await
+    .expect("query unpaged");
+
+    if let Some(roles) = role_opt.rows {
+        for role in roles {
+            let role_id: Option<String> = role.columns[0].as_ref().unwrap().as_text().cloned();
+            let user_id: Option<String> = role.columns[1].as_ref().unwrap().as_text().cloned();
+            let role_name: Option<String> = role.columns[2].as_ref().unwrap().as_text().cloned();
+
+            let user_role = UserRole {
+                id: role_id.unwrap_or_default(),
+                user_id:user_id.unwrap_or_default(),
+                role:role_name,
+            };
+
+           user.role=Some(user_role);
+        }
+    }
+}
 
 
    Json(users)
