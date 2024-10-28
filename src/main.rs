@@ -1,12 +1,83 @@
 #[macro_use] extern crate rocket;
 
-use rocket::{serde::json::Json, State};
+use prometheus::core::Collector;
+use rocket::{serde::json::Json, State,tokio::sync::Mutex};
 use scylla::{Session, SessionBuilder};
 
 use uuid::Uuid;
-
+use prometheus::{IntGauge, Registry, Encoder, TextEncoder};
+use prometheus::proto::MetricFamily;
+use sysinfo::{System};
 mod  models;
 use models::{User, UserRole};
+use std::sync::Arc;
+
+
+
+struct Metrics {
+    cpu_usage: IntGauge,
+    ram_usage: IntGauge,
+}
+
+impl Metrics {
+    fn new(registry: &Registry) -> Metrics {
+        let cpu_usage = IntGauge::new("rust_cpu_usage", "CPU usage in percent").unwrap();
+        let ram_usage = IntGauge::new("rust_ram_usage", "RAM usage in percent").unwrap();
+
+        // Register the metrics with the given registry
+        registry.register(Box::new(cpu_usage.clone())).unwrap();
+        registry.register(Box::new(ram_usage.clone())).unwrap();
+
+        Metrics { cpu_usage, ram_usage }
+    }
+}
+
+#[rocket::get("/metrics")]
+async fn metrics_handler(metrics: &State<Arc<Mutex<Metrics>>>) -> String {
+    let mut sys = System::new_all(); // Create a new System instance
+    sys.refresh_cpu_all(); // Refresh all CPU data
+    sys.refresh_memory(); // Refresh memory data
+
+
+    let mut ram_usage_kb= 0;
+
+     // Get the current process (your project's process)
+     if let Some(process) = sys.process(sysinfo::get_current_pid().expect("Unable to get current PID")) {
+        // RAM usage in KB
+         ram_usage_kb = process.memory();
+    }
+
+
+    // Get the overall CPU usage as a percentage
+    let cpu_usage: f32 = sys.global_cpu_usage(); // Get overall CPU usage
+
+    // Calculate RAM usage as a percentage
+   // let total_memory = sys.total_memory();
+    //let used_memory = sys.used_memory();
+    let ram_usage = ram_usage_kb as i64;
+    //let ram_usage = (used_memory * 100 / total_memory) as i64;
+
+    // Lock the metrics for thread safety
+    let mut metrics_guard = metrics.lock().await;
+    metrics_guard.cpu_usage.set(cpu_usage as i64); // Set CPU usage in the gauge
+    metrics_guard.ram_usage.set(ram_usage); // Set RAM usage in the gauge
+
+    // Encode the metrics for Prometheus
+    let encoder = TextEncoder::new();
+    let mut buffer = Vec::new();
+
+    // Collect metrics into a vector
+    let metric_families: Vec<MetricFamily> = vec![
+        metrics_guard.cpu_usage.collect(),
+        metrics_guard.ram_usage.collect(),
+    ].into_iter().flat_map(|mf| mf).collect();
+
+    // Encode the metrics
+    encoder.encode(&metric_families, &mut buffer).unwrap();
+
+    String::from_utf8(buffer).unwrap() // Convert buffer to String
+}
+
 
 struct CassandraDb {
     session: Session,
@@ -326,32 +397,32 @@ async fn get_users(state: &State<CassandraDb>) -> Json<Vec<User>> {
         eprintln!("No rows found.");
     }
 
-for user in  &mut users {
-    let role_query = "SELECT id, user_id, role FROM my_saas.user_role WHERE user_id = ?  ALLOW FILTERING";
-    let role_params = &[&user.id];
+// for user in  &mut users {
+//     let role_query = "SELECT id, user_id, role FROM my_saas.user_role WHERE user_id = ?  ALLOW FILTERING";
+//     let role_params = &[&user.id];
 
-// Use `query_unpaged` with the single parameter
-let role_opt = state.session
-    .query_unpaged(role_query, role_params.as_ref())
-    .await
-    .expect("query unpaged");
+// // Use `query_unpaged` with the single parameter
+// let role_opt = state.session
+//     .query_unpaged(role_query, role_params.as_ref())
+//     .await
+//     .expect("query unpaged");
 
-    if let Some(roles) = role_opt.rows {
-        for role in roles {
-            let role_id: Option<String> = role.columns[0].as_ref().unwrap().as_text().cloned();
-            let user_id: Option<String> = role.columns[1].as_ref().unwrap().as_text().cloned();
-            let role_name: Option<String> = role.columns[2].as_ref().unwrap().as_text().cloned();
+//     if let Some(roles) = role_opt.rows {
+//         for role in roles {
+//             let role_id: Option<String> = role.columns[0].as_ref().unwrap().as_text().cloned();
+//             let user_id: Option<String> = role.columns[1].as_ref().unwrap().as_text().cloned();
+//             let role_name: Option<String> = role.columns[2].as_ref().unwrap().as_text().cloned();
 
-            let user_role = UserRole {
-                id: role_id.unwrap_or_default(),
-                user_id:user_id.unwrap_or_default(),
-                role:role_name,
-            };
+//             let user_role = UserRole {
+//                 id: role_id.unwrap_or_default(),
+//                 user_id:user_id.unwrap_or_default(),
+//                 role:role_name,
+//             };
 
-           user.role=Some(user_role);
-        }
-    }
-}
+//            user.role=Some(user_role);
+//         }
+//     }
+// }
 
 
    Json(users)
@@ -376,10 +447,14 @@ let role_opt = state.session
 
 #[launch]
  async fn rocket() -> _ {
+    let registry = Registry::new();
+    let metrics = Arc::new(Mutex::new(Metrics::new(&registry)));
+
     let session = init_db().await;
     let db = CassandraDb { session };
     rocket::build()
     .manage(db)
-    .mount("/", routes![get_users,create_user])
+    .manage(metrics)
+    .mount("/", routes![get_users,create_user,metrics_handler])
 }
 
