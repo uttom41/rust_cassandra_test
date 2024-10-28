@@ -46,7 +46,7 @@ pub struct User {
     pub value38: Option<String>,
     pub value39: Option<String>,
     pub value40: Option<String>,
-    pub role: Option<UserRole>,
+  //  pub role: Option<UserRole>,
 }
 
 #[derive(Debug,Deserialize,Serialize)]

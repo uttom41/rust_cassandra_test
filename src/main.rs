@@ -388,7 +388,7 @@ async fn get_users(state: &State<CassandraDb>) -> Json<Vec<User>> {
                     value38,
                     value39,
                     value40,
-                    role:None,
+                   // role:None,
                 };
                 users.push(user);
             
@@ -447,14 +447,15 @@ async fn get_users(state: &State<CassandraDb>) -> Json<Vec<User>> {
 
 #[launch]
  async fn rocket() -> _ {
-    let registry = Registry::new();
-    let metrics = Arc::new(Mutex::new(Metrics::new(&registry)));
+   // let registry = Registry::new();
+  //  let metrics = Arc::new(Mutex::new(Metrics::new(&registry)));
 
     let session = init_db().await;
     let db = CassandraDb { session };
     rocket::build()
     .manage(db)
-    .manage(metrics)
-    .mount("/", routes![get_users,create_user,metrics_handler])
+   // .manage(metrics)
+    //.mount("/", routes![get_users,create_user,metrics_handler])
+    .mount("/", routes![get_users,create_user])
 }
 
