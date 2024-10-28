@@ -274,6 +274,78 @@ async fn insert_role(user_id: &String, state: &State<CassandraDb>) ->Json<UserRo
 
 }
 
+
+#[get("/users?<count>", format = "application/json")]
+async fn get_users_insert(count: Option<i32>, state: &State<Arc<CassandraDb>>) -> Result<String, String> {
+    let count = count.unwrap_or(10); // Default to 10 if count is not provided
+    
+    for i in 0..count {
+        let id = Uuid::new_v4(); // Generate a new UUID for the user
+        let insert_query = "INSERT INTO my_saas.users (
+        id, username, email, password,
+        value1, value2, value3, value4, value5, value6, value7, value8, value9, value10,
+         value11, value12, value13, value14, value15, value16, value17, value18, value19, value20,
+         value21, value22, value23, value24, value25, value26, value27, value28, value29, value30,
+          value31, value32, value33, value34, value35, value36, value37, value38, value39, value40
+        ) VALUES (
+         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 
+         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 
+         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 
+         ?, ?, ?, ?)";
+       
+         let result = state.session.query_unpaged(insert_query, [
+            id.to_string(),
+            "user_name_".to_string() + &i.to_string(),
+            "user_email_".to_string() + &i.to_string() + "@example.com",
+            "password".to_string(),
+            "value1_".to_string() + &i.to_string(),
+            "value2_".to_string() + &i.to_string(),
+            "value3_".to_string() + &i.to_string(),
+            "value4_".to_string() + &i.to_string(),
+            "value5_".to_string() + &i.to_string(),
+            "value6_".to_string() + &i.to_string(),
+            "value7_".to_string() + &i.to_string(),
+        "value8_".to_string() + &i.to_string(),
+            "value9_".to_string() + &i.to_string(),
+            "value10_".to_string() + &i.to_string(),
+            "value11_".to_string() + &i.to_string(),
+            "value12_".to_string() + &i.to_string(),
+            "value13_".to_string() + &i.to_string(),
+            "value14_".to_string() + &i.to_string(),
+            "value15_".to_string() + &i.to_string(),
+            "value16_".to_string() + &i.to_string(),
+            "value17_".to_string() + &i.to_string(),
+            "value18_".to_string() + &i.to_string(),
+            "value19_".to_string() + &i.to_string(),
+            "value20_".to_string() + &i.to_string(),
+            "value21_".to_string() + &i.to_string(),
+            "value22_".to_string() + &i.to_string(),
+            "value23_".to_string() + &i.to_string(),
+            "value24_".to_string() + &i.to_string(),
+            "value25_".to_string() + &i.to_string(),
+            "value26_".to_string() + &i.to_string(),
+            "value27_".to_string() + &i.to_string(),
+            "value28_".to_string() + &i.to_string(),
+            "value29_".to_string() + &i.to_string(),
+            "value30_".to_string() + &i.to_string(),
+            "value31_".to_string() + &i.to_string(),
+            "value32_".to_string() + &i.to_string(),
+            "value33_".to_string() + &i.to_string(),
+            "value34_".to_string() + &i.to_string(),
+            "value35_".to_string() + &i.to_string(),
+            "value36_".to_string() + &i.to_string(),
+            "value37_".to_string() + &i.to_string(),
+            "value38_".to_string() + &i.to_string(),
+            "value39_".to_string() + &i.to_string(),
+            "value40_".to_string() + &i.to_string(),
+        ].as_ref()).await.expect("Data is not available");
+    }
+
+    
+    Ok("user".to_string()) // Return users as JSON
+}
+
 // GET API to fetch all users
 #[get("/users")]
 async fn get_users(state: &State<CassandraDb>) -> Json<Vec<User>> {
@@ -456,6 +528,6 @@ async fn get_users(state: &State<CassandraDb>) -> Json<Vec<User>> {
     .manage(db)
    // .manage(metrics)
     //.mount("/", routes![get_users,create_user,metrics_handler])
-    .mount("/", routes![get_users,create_user])
+    .mount("/", routes![get_users,create_user,get_users_insert])
 }
 
