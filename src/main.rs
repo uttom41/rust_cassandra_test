@@ -2,12 +2,13 @@
 
 use prometheus::core::Collector;
 use rocket::{serde::json::Json, State,tokio::sync::Mutex};
+use scylla::serialize::value::SerializeValue;
 use scylla::{Session, SessionBuilder};
 
 use uuid::Uuid;
 use prometheus::{IntGauge, Registry, Encoder, TextEncoder};
 use prometheus::proto::MetricFamily;
-use sysinfo::{System};
+use sysinfo::System;
 mod  models;
 use models::{User, UserRole};
 use std::sync::Arc;
@@ -275,8 +276,8 @@ async fn insert_role(user_id: &String, state: &State<CassandraDb>) ->Json<UserRo
 }
 
 
-#[get("/users?<count>", format = "application/json")]
-async fn get_users_insert(count: Option<i32>, state: &State<Arc<CassandraDb>>) -> Result<String, String> {
+#[get("/insert?<count>")]
+async fn get_users_insert(count: Option<i32>, state: &State<CassandraDb>) -> Result<String, String> {
     let count = count.unwrap_or(10); // Default to 10 if count is not provided
     
     for i in 0..count {
@@ -293,53 +294,29 @@ async fn get_users_insert(count: Option<i32>, state: &State<Arc<CassandraDb>>) -
          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 
          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 
          ?, ?, ?, ?)";
-       
-         let result = state.session.query_unpaged(insert_query, [
-            id.to_string(),
-            "user_name_".to_string() + &i.to_string(),
-            "user_email_".to_string() + &i.to_string() + "@example.com",
-            "password".to_string(),
-            "value1_".to_string() + &i.to_string(),
-            "value2_".to_string() + &i.to_string(),
-            "value3_".to_string() + &i.to_string(),
-            "value4_".to_string() + &i.to_string(),
-            "value5_".to_string() + &i.to_string(),
-            "value6_".to_string() + &i.to_string(),
-            "value7_".to_string() + &i.to_string(),
-        "value8_".to_string() + &i.to_string(),
-            "value9_".to_string() + &i.to_string(),
-            "value10_".to_string() + &i.to_string(),
-            "value11_".to_string() + &i.to_string(),
-            "value12_".to_string() + &i.to_string(),
-            "value13_".to_string() + &i.to_string(),
-            "value14_".to_string() + &i.to_string(),
-            "value15_".to_string() + &i.to_string(),
-            "value16_".to_string() + &i.to_string(),
-            "value17_".to_string() + &i.to_string(),
-            "value18_".to_string() + &i.to_string(),
-            "value19_".to_string() + &i.to_string(),
-            "value20_".to_string() + &i.to_string(),
-            "value21_".to_string() + &i.to_string(),
-            "value22_".to_string() + &i.to_string(),
-            "value23_".to_string() + &i.to_string(),
-            "value24_".to_string() + &i.to_string(),
-            "value25_".to_string() + &i.to_string(),
-            "value26_".to_string() + &i.to_string(),
-            "value27_".to_string() + &i.to_string(),
-            "value28_".to_string() + &i.to_string(),
-            "value29_".to_string() + &i.to_string(),
-            "value30_".to_string() + &i.to_string(),
-            "value31_".to_string() + &i.to_string(),
-            "value32_".to_string() + &i.to_string(),
-            "value33_".to_string() + &i.to_string(),
-            "value34_".to_string() + &i.to_string(),
-            "value35_".to_string() + &i.to_string(),
-            "value36_".to_string() + &i.to_string(),
-            "value37_".to_string() + &i.to_string(),
-            "value38_".to_string() + &i.to_string(),
-            "value39_".to_string() + &i.to_string(),
-            "value40_".to_string() + &i.to_string(),
-        ].as_ref()).await.expect("Data is not available");
+
+         // Collect all values dynamically
+    let mut values: Vec<String> = Vec::with_capacity(44);
+    
+    // Add the mandatory fields
+    values.push(id.to_string());
+    values.push(format!("user_name_{}", i));
+    values.push(format!("user_email_{}@example.com", i));
+    values.push("password".to_string());
+
+    // Generate dynamic values from value1 to value40
+    for j in 1..=40 {
+        values.push(format!("value{}_{}", j, i));
+    }
+
+// Convert `values` to references of `&String`
+    let query_values: Vec<&String> = values.iter().collect();
+
+    let result = state.session
+    .query_unpaged(insert_query, query_values.as_slice())
+    .await
+    .expect("Data is not available");
+
     }
 
     
@@ -352,122 +329,86 @@ async fn get_users(state: &State<CassandraDb>) -> Json<Vec<User>> {
    
     let mut users = Vec::new();
 
-     let rows_opt = state.session
-     .query_unpaged("SELECT id, username, email, password, value1, value2, value3, value4, value5, value6, value7, value8, value9, value10,
-     value11, value12, value13, value14, value15, value16, value17, value18, value19, value20,
-     value21, value22, value23, value24, value25, value26, value27, value28, value29, value30,
-      value31, value32, value33, value34, value35, value36, value37, value38, value39, value40
-      FROM my_saas.users", &[])
-     .await.expect("Data is not available");
-
-     if let Some(rows) = rows_opt.rows {
+    if let Some(rows) = state.session
+        .query_unpaged(
+            "SELECT id, username, email, password, value1, value2, value3, value4, value5, value6, value7, value8, value9, value10,
+             value11, value12, value13, value14, value15, value16, value17, value18, value19, value20,
+             value21, value22, value23, value24, value25, value26, value27, value28, value29, value30,
+             value31, value32, value33, value34, value35, value36, value37, value38, value39, value40
+             FROM my_saas.users", &[]
+        )
+        .await
+        .expect("Data is not available")
+        .rows
+    {
         for row in rows {
+            // Extract the ID safely, if None, skip this row
+            let id: Option<String> = row.columns[0].as_ref().and_then(|col| col.as_text().cloned());
+            let id = match id {
+                Some(id) => id,
+                None => continue,
+            };
     
-            // Check if the row is Some 
-                // Extract values safely
-                let id: Option<String> = row.columns[0].as_ref().unwrap().as_text().cloned();
-                let username: Option<String> = row.columns[1].as_ref().unwrap().as_text().cloned();
-                let email: Option<String> = row.columns[2].as_ref().unwrap().as_text().cloned();
-                let password: Option<String> = row.columns[3].as_ref().unwrap().as_text().cloned();
-
-                let value1: Option<String> = row.columns[4].as_ref().unwrap().as_text().cloned();
-                let value2: Option<String> = row.columns[5].as_ref().unwrap().as_text().cloned();
-                let value3: Option<String> = row.columns[6].as_ref().unwrap().as_text().cloned();
-                let value4: Option<String> = row.columns[7].as_ref().unwrap().as_text().cloned();
-                let value5: Option<String> = row.columns[8].as_ref().unwrap().as_text().cloned();
-                let value6: Option<String> = row.columns[9].as_ref().unwrap().as_text().cloned();
-                let value7: Option<String> = row.columns[10].as_ref().unwrap().as_text().cloned();
-                let value8: Option<String> = row.columns[11].as_ref().unwrap().as_text().cloned();
-                let value9: Option<String> = row.columns[12].as_ref().unwrap().as_text().cloned();
-                let value10: Option<String> = row.columns[13].as_ref().unwrap().as_text().cloned();
-                let value11: Option<String> = row.columns[14].as_ref().unwrap().as_text().cloned();
-                let value12: Option<String> = row.columns[15].as_ref().unwrap().as_text().cloned();
-                let value13: Option<String> = row.columns[16].as_ref().unwrap().as_text().cloned();
-                let value14: Option<String> = row.columns[17].as_ref().unwrap().as_text().cloned();
-                let value15: Option<String> = row.columns[18].as_ref().unwrap().as_text().cloned();
-                let value16: Option<String> = row.columns[19].as_ref().unwrap().as_text().cloned();
-                let value17: Option<String> = row.columns[20].as_ref().unwrap().as_text().cloned();
-                let value18: Option<String> = row.columns[21].as_ref().unwrap().as_text().cloned();
-                let value19: Option<String> = row.columns[22].as_ref().unwrap().as_text().cloned();
-                let value20: Option<String> = row.columns[23].as_ref().unwrap().as_text().cloned();
-                let value21: Option<String> = row.columns[24].as_ref().unwrap().as_text().cloned();
-                let value22: Option<String> = row.columns[25].as_ref().unwrap().as_text().cloned();
-                let value23: Option<String> = row.columns[26].as_ref().unwrap().as_text().cloned();
-                let value24: Option<String> = row.columns[27].as_ref().unwrap().as_text().cloned();
-                let value25: Option<String> = row.columns[28].as_ref().unwrap().as_text().cloned();
-                let value26: Option<String> = row.columns[29].as_ref().unwrap().as_text().cloned();
-                let value27: Option<String> = row.columns[30].as_ref().unwrap().as_text().cloned();
-                let value28: Option<String> = row.columns[31].as_ref().unwrap().as_text().cloned();
-                let value29: Option<String> = row.columns[32].as_ref().unwrap().as_text().cloned();
-                let value30: Option<String> = row.columns[33].as_ref().unwrap().as_text().cloned();
-                let value31: Option<String> = row.columns[34].as_ref().unwrap().as_text().cloned();
-                let value32: Option<String> = row.columns[35].as_ref().unwrap().as_text().cloned();
-                let value33: Option<String> = row.columns[36].as_ref().unwrap().as_text().cloned();
-                let value34: Option<String> = row.columns[37].as_ref().unwrap().as_text().cloned();
-                let value35: Option<String> = row.columns[38].as_ref().unwrap().as_text().cloned();
-                let value36: Option<String> = row.columns[39].as_ref().unwrap().as_text().cloned();
-                let value37: Option<String> = row.columns[40].as_ref().unwrap().as_text().cloned();
-                let value38: Option<String> = row.columns[41].as_ref().unwrap().as_text().cloned();
-                let value39: Option<String> = row.columns[42].as_ref().unwrap().as_text().cloned();
-                let value40: Option<String> = row.columns[43].as_ref().unwrap().as_text().cloned();
-                
-                let id = match id {
-                    Some(id) =>{id}
-                    None => continue,
-                };
-                let user = User {
-                    id,
-                    username,
-                    email,
-                    password,
-                    value1,
-                    value2,
-                    value3,
-                    value4,
-                    value5,
-                    value6,
-                    value7,
-                    value8,
-                    value9,
-                    value10,
-                    value11,
-                    value12,
-                    value13,
-                    value14,
-                    value15,
-                    value16,
-                    value17,
-                    value18,
-                    value19,
-                    value20,
-                    value21,
-                    value22,
-                    value23,
-                    value24,
-                    value25,
-                    value26,
-                    value27,
-                    value28,
-                    value29,
-                    value30,
-                    value31,
-                    value32,
-                    value33,
-                    value34,
-                    value35,
-                    value36,
-                    value37,
-                    value38,
-                    value39,
-                    value40,
-                   // role:None,
-                };
-                users.push(user);
+            // Extract all values in a loop for brevity
+            let mut values = vec![];
+            for col in row.columns.iter().skip(1).take(40) {
+                values.push(col.as_ref().and_then(|c| c.as_text().cloned()));
+            }
+    
+            // Create user and push to users vector
+            let user = User {
+                id,
+                username: values[0].clone(),
+                email: values[1].clone(),
+                password: values[2].clone(),
+                value1: values[3].clone(),
+                value2: values[4].clone(),
+                value3: values[4].clone(),
+                value4: values[4].clone(),
+                value5: values[4].clone(),
+                value6: values[4].clone(),
+                value7: values[4].clone(),
+                value8: values[4].clone(),
+                value9: values[4].clone(),
+                value10: values[4].clone(),
+                value11: values[4].clone(),
+                value12: values[4].clone(),
+                value13: values[4].clone(),
+                value14: values[4].clone(),
+                value15: values[4].clone(),
+                value16: values[4].clone(),
+                value17: values[4].clone(),
+                value18: values[4].clone(),
+                value19: values[4].clone(),
+                value20: values[4].clone(),
+                value21: values[4].clone(),
+                value22: values[4].clone(),
+                value23: values[4].clone(),
+                value24: values[4].clone(),
+                value25: values[4].clone(),
+                value26: values[4].clone(),
+                value27: values[4].clone(),
+                value28: values[4].clone(),
+                value29: values[4].clone(),
+                value30: values[4].clone(),
+                value31: values[4].clone(),
+                value32: values[4].clone(),
+                value33: values[4].clone(),
+                value34: values[4].clone(),
+                value35: values[4].clone(),
+                value36: values[4].clone(),
+                value37: values[4].clone(),
+                value38: values[4].clone(),
+                value39: values[4].clone(),
+                value40: values[39].clone(),
+            };
             
+            users.push(user);
         }
     } else {
         eprintln!("No rows found.");
     }
+    
 
 // for user in  &mut users {
 //     let role_query = "SELECT id, user_id, role FROM my_saas.user_role WHERE user_id = ?  ALLOW FILTERING";
